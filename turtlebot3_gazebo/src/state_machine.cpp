@@ -27,7 +27,10 @@ StateMachine::StateMachine()
   prev_x_(0.0),
   prev_y_(0.0),
   stuck_counter_(0),
-  recovery_counter_(0)
+  recovery_counter_(0),
+  opening_detected_(false),
+  opening_start_x_(0.0),
+  opening_start_y_(0.0)
 {
 }
 
@@ -78,8 +81,13 @@ bool StateMachine::shouldTransition(
             break;
             
         case RobotState::DRIVE_FORWARD:
-            // Check if we need to stop and turn sharply
-            if (data.forward_distance < forward_threshold_) {
+            // Check for 90° right turn opportunity (right wall opens up)
+            if (isRightTurnOpportunity(data)) {
+                // Right wall disappeared, execute sharp 90° right turn
+                prev_pose_ = pose.yaw;
+                current_state_ = RobotState::SHARP_TURN_RIGHT;
+                state_changed = true;
+            } else if (data.forward_distance < forward_threshold_) {
                 // Obstacle ahead, need to turn
                 current_state_ = RobotState::GET_DIRECTION;
                 state_changed = true;
@@ -110,19 +118,15 @@ bool StateMachine::shouldTransition(
             
         case RobotState::SHARP_TURN_LEFT:
         case RobotState::SHARP_TURN_RIGHT: {
-            // Sharp 90° turn for corners
+            // Sharp 90° turn for corners - complete the full turn precisely
             double angle_turned = std::fabs(prev_pose_ - pose.yaw);
             // Handle angle wrapping around ±π
             if (angle_turned > M_PI) {
                 angle_turned = 2 * M_PI - angle_turned;
             }
             
-            if (angle_turned >= sharp_turn_angle_ * 0.95) {
-                // Turned ~90°, check situation
-                current_state_ = RobotState::GET_DIRECTION;
-                state_changed = true;
-            } else if (data.forward_distance > forward_threshold_ + 0.3 && angle_turned >= sharp_turn_angle_ * 0.7) {
-                // Forward is very clear and we've turned at least 63°, good enough
+            if (angle_turned >= sharp_turn_angle_ * 0.98) {
+                // Turned ~88°+, very close to 90°
                 current_state_ = RobotState::GET_DIRECTION;
                 state_changed = true;
             }
@@ -192,6 +196,17 @@ bool StateMachine::isCornerDetected(const SensorData& data) const {
             data.right_distance > corner_threshold);
 }
 
+bool StateMachine::isRightTurnOpportunity(const SensorData& data) const {
+    // Detect 90° right turn opportunity: right wall suddenly opens up significantly
+    // Use a much larger threshold to ensure we're at the actual corner, not just seeing it ahead
+    const double right_opening_threshold = 2.0;  // Right side opens up significantly
+    
+    // Only trigger if forward is clear AND right side is very open
+    // This ensures we're at the corner, not just approaching it
+    return (data.forward_distance > forward_threshold_ + 0.3 && 
+            data.right_distance > right_opening_threshold);
+}
+
 double StateMachine::calculateWallFollowingCorrection(const SensorData& data) const {
     // Proportional control to maintain constant distance from right wall
     // Target distance is side_threshold_ (0.6m)
@@ -254,15 +269,15 @@ MotionCommand StateMachine::getStateCommand(const SensorData& data) const {
             break;
             
         case RobotState::SHARP_TURN_LEFT:
-            // Sharp 90° left turn for corners (faster rotation)
+            // Sharp 90° left turn for corners (aggressive rotation)
             cmd.linear = 0.0;
-            cmd.angular = 1.2;
+            cmd.angular = 1.5;
             break;
             
         case RobotState::SHARP_TURN_RIGHT:
-            // Sharp 90° right turn for corners (faster rotation)
+            // Sharp 90° right turn for corners (aggressive rotation)
             cmd.linear = 0.0;
-            cmd.angular = -1.2;
+            cmd.angular = -1.5;
             break;
             
         case RobotState::RECOVERY:

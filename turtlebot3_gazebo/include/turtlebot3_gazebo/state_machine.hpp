@@ -75,10 +75,16 @@ private:
     int stuck_counter_;          // Counter for detecting stuck state
     int recovery_counter_;       // Counter for recovery duration
     
+    // Right turn opportunity tracking
+    bool opening_detected_;      // Flag when opening is first detected
+    double opening_start_x_;     // X position when opening detected
+    double opening_start_y_;     // Y position when opening detected
+    
     // Helper functions
     bool isCollisionDetected(const SensorData& data, const RobotPose& pose);
     bool isStable(const RobotPose& pose) const;
     bool isCornerDetected(const SensorData& data) const;
+    bool isRightTurnOpportunity(const SensorData& data) const;
     double calculateWallFollowingCorrection(const SensorData& data) const;
 };
 
