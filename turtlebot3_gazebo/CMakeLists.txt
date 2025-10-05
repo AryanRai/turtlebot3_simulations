@@ -50,7 +50,13 @@ include_directories(
 
 set(EXEC_NAME "turtlebot3_drive")
 
-add_executable(${EXEC_NAME} src/turtlebot3_drive.cpp)
+add_executable(${EXEC_NAME} 
+  src/turtlebot3_drive.cpp
+  src/navigation_controller.cpp
+  src/sensor_processor.cpp
+  src/motion_controller.cpp
+  src/state_machine.cpp
+)
 target_link_libraries(${EXEC_NAME}
   ${geometry_msgs_TARGETS}
   ${nav_msgs_TARGETS}
