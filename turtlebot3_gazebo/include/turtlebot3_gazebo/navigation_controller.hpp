@@ -51,6 +51,18 @@ public:
      */
     MotionCommand getMotionCommand() const;
     
+    /**
+     * @brief Enable or disable centering mode
+     * @param enable True for centering mode, False for right-wall-only mode
+     */
+    void setUseCentering(bool enable);
+    
+    /**
+     * @brief Get current centering mode status
+     * @return True if centering enabled, False if right-wall-only
+     */
+    bool getUseCentering() const;
+    
 private:
     StateMachine* state_machine_;       // State management
     SensorData current_sensor_data_;    // Latest sensor readings

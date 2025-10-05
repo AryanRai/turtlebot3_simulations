@@ -31,8 +31,17 @@ StateMachine::StateMachine()
   opening_detected_(false),
   opening_start_x_(0.0),
   opening_start_y_(0.0),
-  prev_right_distance_(0.0)
+  prev_right_distance_(0.0),
+  use_centering_(true)  // Default to centering mode
 {
+}
+
+void StateMachine::setUseCentering(bool enable) {
+    use_centering_ = enable;
+}
+
+bool StateMachine::getUseCentering() const {
+    return use_centering_;
 }
 
 void StateMachine::setState(RobotState state) {
@@ -244,29 +253,37 @@ double StateMachine::calculateWallFollowingCorrection(const SensorData& data) co
     const double kp = 1.5;  // Proportional gain for single wall following
     const double kp_center = 0.3;  // Much lower gain for centering to avoid oscillation
     const double max_correction = 0.5;  // Maximum angular correction (rad/s)
-    const double wall_detect_threshold = 3.5;  // Distance to consider a wall present (increased for wider corridors)
-    
-    bool left_wall_present = data.left_distance < wall_detect_threshold;
-    bool right_wall_present = data.right_distance < wall_detect_threshold;
+    const double wall_detect_threshold = 3.5;  // Distance to consider a wall present
     
     double correction = 0.0;
     
-    if (left_wall_present && right_wall_present) {
-        // Both walls detected - center between them with gentle correction
-        // If left_distance > right_distance, we're closer to right wall, turn left (positive)
-        // If right_distance > left_distance, we're closer to left wall, turn right (negative)
-        double balance_error = data.left_distance - data.right_distance;
-        correction = kp_center * balance_error;  // Use lower gain to prevent oscillation
-    } else if (right_wall_present) {
-        // Only right wall - maintain distance from it
-        double error = data.right_distance - side_threshold_;
-        correction = -kp * error;  // Negate because positive angular = left turn
-    } else if (left_wall_present) {
-        // Only left wall - maintain distance from it
-        double error = data.left_distance - side_threshold_;
-        correction = kp * error;  // Positive = turn left away from wall
+    if (use_centering_) {
+        // CENTERING MODE: Balance between walls when both present
+        bool left_wall_present = data.left_distance < wall_detect_threshold;
+        bool right_wall_present = data.right_distance < wall_detect_threshold;
+        
+        if (left_wall_present && right_wall_present) {
+            // Both walls detected - center between them
+            double balance_error = data.left_distance - data.right_distance;
+            correction = kp_center * balance_error;
+        } else if (right_wall_present) {
+            // Only right wall - maintain distance from it
+            double error = data.right_distance - side_threshold_;
+            correction = -kp * error;
+        } else if (left_wall_present) {
+            // Only left wall - maintain distance from it
+            double error = data.left_distance - side_threshold_;
+            correction = kp * error;
+        }
+    } else {
+        // RIGHT WALL FOLLOW MODE: Only follow right wall (original behavior)
+        if (data.right_distance < wall_detect_threshold) {
+            // Right wall present - maintain distance from it
+            double error = data.right_distance - side_threshold_;
+            correction = -kp * error;
+        }
+        // Ignore left wall, drive straight if no right wall
     }
-    // If no walls detected, correction stays 0 (drive straight)
     
     // Clamp correction to avoid excessive turning
     if (correction > max_correction) {

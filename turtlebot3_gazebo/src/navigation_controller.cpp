@@ -62,4 +62,12 @@ MotionCommand NavigationController::getMotionCommand() const {
     return current_command_;
 }
 
+void NavigationController::setUseCentering(bool enable) {
+    state_machine_->setUseCentering(enable);
+}
+
+bool NavigationController::getUseCentering() const {
+    return state_machine_->getUseCentering();
+}
+
 }  // namespace turtlebot3_gazebo

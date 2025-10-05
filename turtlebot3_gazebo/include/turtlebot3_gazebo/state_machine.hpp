@@ -59,6 +59,18 @@ public:
      */
     MotionCommand getStateCommand(const SensorData& data) const;
     
+    /**
+     * @brief Enable or disable centering mode
+     * @param enable True for centering mode, False for right-wall-only mode
+     */
+    void setUseCentering(bool enable);
+    
+    /**
+     * @brief Get current centering mode status
+     * @return True if centering enabled, False if right-wall-only
+     */
+    bool getUseCentering() const;
+    
 private:
     RobotState current_state_;   // Current navigation state
     double prev_pose_;           // Previous yaw for turn tracking
@@ -80,6 +92,9 @@ private:
     double opening_start_x_;     // X position when opening detected
     double opening_start_y_;     // Y position when opening detected
     double prev_right_distance_; // Previous right distance for change detection
+    
+    // Driving mode configuration
+    bool use_centering_;         // True = center between walls, False = right wall only
     
     // Helper functions
     bool isCollisionDetected(const SensorData& data, const RobotPose& pose);
