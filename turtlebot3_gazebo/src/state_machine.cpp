@@ -80,20 +80,43 @@ bool StateMachine::shouldTransition(
             }
             break;
             
-        case RobotState::DRIVE_FORWARD:
+        case RobotState::DRIVE_FORWARD: {
             // Check for 90° right turn opportunity (right wall opens up)
             if (isRightTurnOpportunity(data)) {
-                // Right wall disappeared, execute sharp 90° right turn
-                prev_pose_ = pose.yaw;
-                current_state_ = RobotState::SHARP_TURN_RIGHT;
-                state_changed = true;
-            } else if (data.forward_distance < forward_threshold_) {
-                // Obstacle ahead, need to turn
-                current_state_ = RobotState::GET_DIRECTION;
-                state_changed = true;
+                if (!opening_detected_) {
+                    // First time detecting opening - mark position
+                    opening_detected_ = true;
+                    opening_start_x_ = pose.x;
+                    opening_start_y_ = pose.y;
+                } else {
+                    // Opening already detected - check if we've moved far enough into it
+                    double distance_into_opening = std::sqrt(
+                        std::pow(pose.x - opening_start_x_, 2) + 
+                        std::pow(pose.y - opening_start_y_, 2)
+                    );
+                    
+                    // Turn only after moving ~0.3-0.4m into the opening (midway through)
+                    if (distance_into_opening > 0.35) {
+                        // Now execute sharp 90° right turn
+                        prev_pose_ = pose.yaw;
+                        current_state_ = RobotState::SHARP_TURN_RIGHT;
+                        state_changed = true;
+                        opening_detected_ = false;  // Reset for next opening
+                    }
+                }
+            } else {
+                // No opening detected, reset flag
+                opening_detected_ = false;
+                
+                if (data.forward_distance < forward_threshold_) {
+                    // Obstacle ahead, need to turn
+                    current_state_ = RobotState::GET_DIRECTION;
+                    state_changed = true;
+                }
             }
             // Otherwise keep driving forward
             break;
+        }
             
         case RobotState::TURN_RIGHT:
         case RobotState::TURN_LEFT: {
