@@ -43,35 +43,41 @@ bool StateMachine::shouldTransition(
     switch (current_state_) {
         case RobotState::GET_DIRECTION:
             // Analyze sensor data and decide next action
-            if (data.forward_distance > forward_threshold_) {
-                // Forward is clear
-                if (data.left_distance < side_threshold_) {
-                    // Left wall close, turn right to maintain right wall
-                    prev_pose_ = pose.yaw;
-                    current_state_ = RobotState::TURN_RIGHT;
-                    state_changed = true;
-                } else if (data.right_distance < side_threshold_) {
-                    // Right wall close, turn left to avoid collision
-                    prev_pose_ = pose.yaw;
-                    current_state_ = RobotState::TURN_LEFT;
-                    state_changed = true;
-                } else {
-                    // Path clear, drive forward
-                    current_state_ = RobotState::DRIVE_FORWARD;
-                    state_changed = true;
-                }
-            } else {
-                // Forward blocked, turn right
+            if (data.forward_distance < forward_threshold_) {
+                // Forward blocked, turn left (away from right wall)
+                prev_pose_ = pose.yaw;
+                current_state_ = RobotState::TURN_LEFT;
+                state_changed = true;
+            } else if (data.right_distance > side_threshold_ + 0.2) {
+                // Right wall too far, turn right to get closer
                 prev_pose_ = pose.yaw;
                 current_state_ = RobotState::TURN_RIGHT;
+                state_changed = true;
+            } else if (data.right_distance < side_threshold_ - 0.2) {
+                // Right wall too close, turn left to avoid collision
+                prev_pose_ = pose.yaw;
+                current_state_ = RobotState::TURN_LEFT;
+                state_changed = true;
+            } else {
+                // Good distance from right wall, drive forward
+                current_state_ = RobotState::DRIVE_FORWARD;
                 state_changed = true;
             }
             break;
             
         case RobotState::DRIVE_FORWARD:
-            // Always return to GET_DIRECTION after moving
-            current_state_ = RobotState::GET_DIRECTION;
-            state_changed = true;
+            // Check if we need to adjust - don't immediately go back to GET_DIRECTION
+            if (data.forward_distance < forward_threshold_) {
+                // Obstacle ahead, need to turn
+                current_state_ = RobotState::GET_DIRECTION;
+                state_changed = true;
+            } else if (data.right_distance > side_threshold_ + 0.3 || 
+                       data.right_distance < side_threshold_ - 0.3) {
+                // Wall distance changed significantly, need to adjust
+                current_state_ = RobotState::GET_DIRECTION;
+                state_changed = true;
+            }
+            // Otherwise keep driving forward
             break;
             
         case RobotState::TURN_RIGHT:
