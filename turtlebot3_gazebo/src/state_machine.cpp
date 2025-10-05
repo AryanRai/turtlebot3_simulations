@@ -14,6 +14,7 @@
 
 #include "turtlebot3_gazebo/state_machine.hpp"
 #include <cmath>
+#include <iostream>
 
 namespace turtlebot3_gazebo {
 
@@ -32,7 +33,8 @@ StateMachine::StateMachine()
   opening_start_x_(0.0),
   opening_start_y_(0.0),
   prev_right_distance_(0.0),
-  use_centering_(true)  // Default to centering mode
+  corridor_width_(2.0),  // Default corridor width
+  use_centering_(false)  // Default to right-wall-follow (more reliable for maze solving)
 {
 }
 
@@ -42,6 +44,31 @@ void StateMachine::setUseCentering(bool enable) {
 
 bool StateMachine::getUseCentering() const {
     return use_centering_;
+}
+
+double StateMachine::calculateAdaptiveTurnDistance(double corridor_width) const {
+    // Calculate how far to drive into opening before turning
+    // Based on corridor width for adaptive behavior
+    
+    // Strategy: Turn early to avoid overshooting
+    // Reduced distances for more responsive turning
+    
+    const double min_distance = 0.15;  // Minimum turn distance (narrow corridors)
+    const double max_distance = 0.4;   // Maximum turn distance (wide corridors) - REDUCED
+    
+    // Calculate turn distance as a fraction of corridor width
+    // For a 2m corridor: turn at ~0.3m (15% of width) - REDUCED from 40%
+    // For a 4m corridor: turn at ~0.4m (capped at max) - REDUCED
+    double turn_distance = corridor_width * 0.15;  // REDUCED from 0.4 to 0.15
+    
+    // Clamp to reasonable bounds
+    if (turn_distance < min_distance) {
+        turn_distance = min_distance;
+    } else if (turn_distance > max_distance) {
+        turn_distance = max_distance;
+    }
+    
+    return turn_distance;
 }
 
 void StateMachine::setState(RobotState state) {
@@ -94,24 +121,47 @@ bool StateMachine::shouldTransition(
             // Check for 90° right turn opportunity (right wall opens up)
             if (isRightTurnOpportunity(data)) {
                 if (!opening_detected_) {
-                    // First time detecting opening - mark position
+                    // First time detecting opening
                     opening_detected_ = true;
                     opening_start_x_ = pose.x;
                     opening_start_y_ = pose.y;
+                    
+                    // Measure current corridor width
+                    corridor_width_ = data.left_distance + data.right_distance;
+                    
+                    // DEBUG OUTPUT
+                    std::cout << "\n=== TURN OPPORTUNITY DETECTED ===" << std::endl;
+                    std::cout << "Forward: " << data.forward_distance << "m" << std::endl;
+                    std::cout << "Left: " << data.left_distance << "m" << std::endl;
+                    std::cout << "Right: " << data.right_distance << "m" << std::endl;
+                    std::cout << "Corridor width: " << corridor_width_ << "m" << std::endl;
+                    std::cout << ">>> WILL DRIVE FORWARD BEFORE TURNING <<<" << std::endl;
+                    std::cout << "================================\n" << std::endl;
+                    
+                    // Always drive forward a bit to position properly
+                    // Don't turn immediately - this causes the robot to turn too early
                 } else {
-                    // Opening already detected - check if we've moved far enough into it
+                    // Opening already detected - check if we've moved far enough
                     double distance_into_opening = std::sqrt(
                         std::pow(pose.x - opening_start_x_, 2) + 
                         std::pow(pose.y - opening_start_y_, 2)
                     );
                     
-                    // Turn only after moving ~0.3-0.4m into the opening (midway through)
-                    if (distance_into_opening > 0.35) {
-                        // Now execute sharp 90° right turn
+                    // Calculate adaptive turn distance - REDUCED for sharper turns
+                    // Narrower corridors = turn sooner for tighter radius
+                    // Wider corridors = can turn a bit later
+                    double turn_distance = std::min(0.2, corridor_width_ * 0.12);  // REDUCED from 0.3 and 0.2
+                    
+                    std::cout << "[Driving into opening: " << distance_into_opening 
+                             << "m / " << turn_distance << "m]" << std::endl;
+                    
+                    if (distance_into_opening > turn_distance) {
+                        std::cout << "\n>>> DRIVEN " << distance_into_opening << "m, NOW TURNING RIGHT <<<\n" << std::endl;
+                        // Execute sharp 90° right turn
                         prev_pose_ = pose.yaw;
                         current_state_ = RobotState::SHARP_TURN_RIGHT;
                         state_changed = true;
-                        opening_detected_ = false;  // Reset for next opening
+                        opening_detected_ = false;
                     }
                 }
             } else {
@@ -151,17 +201,30 @@ bool StateMachine::shouldTransition(
             
         case RobotState::SHARP_TURN_LEFT:
         case RobotState::SHARP_TURN_RIGHT: {
-            // Sharp 90° turn for corners - complete the full turn precisely
+            // Sharp 90° turn for corners - complete the FULL turn
             double angle_turned = std::fabs(prev_pose_ - pose.yaw);
             // Handle angle wrapping around ±π
             if (angle_turned > M_PI) {
                 angle_turned = 2 * M_PI - angle_turned;
             }
             
-            if (angle_turned >= sharp_turn_angle_ * 0.98) {
-                // Turned ~88°+, very close to 90°
+            double angle_degrees = angle_turned * RAD2DEG;
+            double target_degrees = sharp_turn_angle_ * RAD2DEG;
+            
+            // Log progress every 10 degrees
+            static double last_logged = 0;
+            if (angle_degrees - last_logged > 10.0) {
+                std::cout << "[Turning: " << angle_degrees << "° / " << target_degrees << "°]" << std::endl;
+                last_logged = angle_degrees;
+            }
+            
+            // Complete the FULL 90° turn - increased threshold to ensure completion
+            if (angle_turned >= sharp_turn_angle_ * 1.0) {
+                // Turned full 90°
+                std::cout << "\n>>> TURN COMPLETE: " << angle_degrees << "° <<<\n" << std::endl;
                 current_state_ = RobotState::GET_DIRECTION;
                 state_changed = true;
+                last_logged = 0;
             }
             break;
         }
@@ -231,22 +294,29 @@ bool StateMachine::isCornerDetected(const SensorData& data) const {
 }
 
 bool StateMachine::isRightTurnOpportunity(const SensorData& data) const {
-    // Detect 90° right turn opportunity by looking for a significant increase in right distance
-    // This indicates the right wall has ended (opening appeared)
+    // SIMPLIFIED: Detect right turn when forward is clear AND right is very open
+    // This works better than trying to detect "wall ending" when already in open space
     
-    const double min_increase = 1.0;  // Right distance must increase by at least 1.0m
-    const double min_absolute_distance = 2.5;  // And be at least 2.5m away
+    bool forward_clear = data.forward_distance > forward_threshold_ + 0.5;  // Forward very clear
+    bool right_very_open = data.right_distance > 2.5;  // Right side very open
+    bool left_has_wall = data.left_distance < 2.0;  // Left wall present (confirms we're in corridor)
     
-    // Check if right distance increased significantly from previous reading
-    double distance_increase = data.right_distance - prev_right_distance_;
+    // DEBUG: Log detection attempts
+    static int debug_counter = 0;
+    if (++debug_counter % 50 == 0) {  // Every 50 cycles (0.5 seconds)
+        std::cout << "[Right Turn Check] F:" << data.forward_distance 
+                 << " L:" << data.left_distance
+                 << " R:" << data.right_distance 
+                 << " | FwdOK:" << (forward_clear ? "Y" : "N")
+                 << " RightOpen:" << (right_very_open ? "Y" : "N")
+                 << " LeftWall:" << (left_has_wall ? "Y" : "N") << std::endl;
+    }
     
-    // Only trigger if:
-    // 1. Forward is clear
-    // 2. Right distance increased significantly (wall ended)
-    // 3. Right distance is now large (confirming opening)
-    return (data.forward_distance > forward_threshold_ + 0.3 && 
-            distance_increase > min_increase &&
-            data.right_distance > min_absolute_distance);
+    // Trigger right turn if:
+    // 1. Forward is very clear (can continue straight or turn)
+    // 2. Right side is very open (turn opportunity)
+    // 3. Left wall present (confirms we're following a corridor, not in open space)
+    return forward_clear && right_very_open && left_has_wall;
 }
 
 double StateMachine::calculateWallFollowingCorrection(const SensorData& data) const {
@@ -257,6 +327,13 @@ double StateMachine::calculateWallFollowingCorrection(const SensorData& data) co
     
     double correction = 0.0;
     
+    // CRITICAL: If we're in the middle of detecting/executing a turn, don't apply centering
+    // This prevents the robot from turning the wrong way when right wall disappears
+    if (opening_detected_) {
+        // Turn in progress - drive straight, no correction
+        return 0.0;
+    }
+    
     if (use_centering_) {
         // CENTERING MODE: Balance between walls when both present
         bool left_wall_present = data.left_distance < wall_detect_threshold;
@@ -266,15 +343,25 @@ double StateMachine::calculateWallFollowingCorrection(const SensorData& data) co
             // Both walls detected - center between them
             double balance_error = data.left_distance - data.right_distance;
             correction = kp_center * balance_error;
-        } else if (right_wall_present) {
+        } else if (right_wall_present && !left_wall_present) {
             // Only right wall - maintain distance from it
             double error = data.right_distance - side_threshold_;
             correction = -kp * error;
-        } else if (left_wall_present) {
-            // Only left wall - maintain distance from it
-            double error = data.left_distance - side_threshold_;
-            correction = kp * error;
+        } else if (left_wall_present && !right_wall_present) {
+            // Only left wall present - this is tricky
+            // In centering mode, we should NOT try to turn right to "balance"
+            // Instead, just maintain distance from left wall (turn left if too close)
+            // But ONLY if we're too close - otherwise drive straight
+            if (data.left_distance < side_threshold_ * 0.8) {
+                // Too close to left wall - turn away (right)
+                double error = data.left_distance - side_threshold_;
+                correction = kp * error * 0.5;  // Reduced gain
+            } else {
+                // Left wall at safe distance - drive straight
+                correction = 0.0;
+            }
         }
+        // If no walls detected, correction stays 0 (drive straight)
     } else {
         // RIGHT WALL FOLLOW MODE: Only follow right wall (original behavior)
         if (data.right_distance < wall_detect_threshold) {
@@ -328,15 +415,15 @@ MotionCommand StateMachine::getStateCommand(const SensorData& data) const {
             break;
             
         case RobotState::SHARP_TURN_LEFT:
-            // Sharp 90° left turn for corners (aggressive rotation)
+            // Sharp 90° left turn for corners (very aggressive rotation for tight turns)
             cmd.linear = 0.0;
-            cmd.angular = 1.5;
+            cmd.angular = 2.0;  // INCREASED from 1.5 for faster, tighter turns
             break;
             
         case RobotState::SHARP_TURN_RIGHT:
-            // Sharp 90° right turn for corners (aggressive rotation)
+            // Sharp 90° right turn for corners (very aggressive rotation for tight turns)
             cmd.linear = 0.0;
-            cmd.angular = -1.5;
+            cmd.angular = -2.0;  // INCREASED from -1.5 for faster, tighter turns
             break;
             
         case RobotState::RECOVERY:

@@ -92,6 +92,7 @@ private:
     double opening_start_x_;     // X position when opening detected
     double opening_start_y_;     // Y position when opening detected
     double prev_right_distance_; // Previous right distance for change detection
+    double corridor_width_;      // Measured corridor width for adaptive turning
     
     // Driving mode configuration
     bool use_centering_;         // True = center between walls, False = right wall only
@@ -102,6 +103,7 @@ private:
     bool isCornerDetected(const SensorData& data) const;
     bool isRightTurnOpportunity(const SensorData& data) const;
     double calculateWallFollowingCorrection(const SensorData& data) const;
+    double calculateAdaptiveTurnDistance(double corridor_width) const;
 };
 
 }  // namespace turtlebot3_gazebo

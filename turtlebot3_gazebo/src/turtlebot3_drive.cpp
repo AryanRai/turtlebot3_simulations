@@ -45,14 +45,14 @@ Turtlebot3Drive::Turtlebot3Drive()
     /************************************************************
     ** Declare and get ROS2 parameters
     ************************************************************/
-    this->declare_parameter("use_centering", true);  // true = center, false = right wall only
+    this->declare_parameter("use_centering", false);  // false = right wall only (default, more reliable)
     bool use_centering = this->get_parameter("use_centering").as_bool();
     nav_controller_->setUseCentering(use_centering);
     
     if (use_centering) {
         RCLCPP_INFO(this->get_logger(), "Driving Mode: CENTERING (balances between walls)");
     } else {
-        RCLCPP_INFO(this->get_logger(), "Driving Mode: RIGHT WALL FOLLOW (original behavior)");
+        RCLCPP_INFO(this->get_logger(), "Driving Mode: RIGHT WALL FOLLOW (default, more reliable)");
     }
     
     /************************************************************
