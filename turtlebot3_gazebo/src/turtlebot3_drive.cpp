@@ -39,6 +39,8 @@ Turtlebot3Drive::Turtlebot3Drive()
     robot_pose_.x = 0.0;
     robot_pose_.y = 0.0;
     robot_pose_.yaw = 0.0;
+    robot_pose_.roll = 0.0;
+    robot_pose_.pitch = 0.0;
     
     /************************************************************
     ** Initialize ROS2 publishers and subscribers
@@ -96,7 +98,7 @@ void Turtlebot3Drive::scan_callback(
 void Turtlebot3Drive::odom_callback(
     const nav_msgs::msg::Odometry::SharedPtr msg)
 {
-    // Extract yaw angle from quaternion
+    // Extract roll, pitch, yaw angles from quaternion
     tf2::Quaternion q(
         msg->pose.pose.orientation.x,
         msg->pose.pose.orientation.y,
@@ -107,10 +109,12 @@ void Turtlebot3Drive::odom_callback(
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     
-    // Update robot pose
+    // Update robot pose with all orientation data
     robot_pose_.x = msg->pose.pose.position.x;
     robot_pose_.y = msg->pose.pose.position.y;
     robot_pose_.yaw = yaw;
+    robot_pose_.roll = roll;
+    robot_pose_.pitch = pitch;
 }
 
 /********************************************************************************

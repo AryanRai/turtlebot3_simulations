@@ -41,9 +41,11 @@ struct SensorData {
  * @brief Robot pose information
  */
 struct RobotPose {
-    double x;    // X position in meters
-    double y;    // Y position in meters
-    double yaw;  // Orientation in radians
+    double x;      // X position in meters
+    double y;      // Y position in meters
+    double yaw;    // Orientation in radians
+    double roll;   // Roll angle in radians (tilt side-to-side)
+    double pitch;  // Pitch angle in radians (tilt front-back)
 };
 
 /**
@@ -58,10 +60,13 @@ struct MotionCommand {
  * @brief Robot navigation states
  */
 enum class RobotState {
-    GET_DIRECTION,  // Analyze sensors and decide next action
-    DRIVE_FORWARD,  // Move forward at constant velocity
-    TURN_RIGHT,     // Rotate clockwise
-    TURN_LEFT       // Rotate counter-clockwise
+    GET_DIRECTION,     // Analyze sensors and decide next action
+    DRIVE_FORWARD,     // Move forward at constant velocity
+    TURN_RIGHT,        // Rotate clockwise (gentle)
+    TURN_LEFT,         // Rotate counter-clockwise (gentle)
+    SHARP_TURN_LEFT,   // Sharp 90° left turn for corners
+    SHARP_TURN_RIGHT,  // Sharp 90° right turn for corners
+    RECOVERY           // Recover from collision/wobble
 };
 
 }  // namespace turtlebot3_gazebo

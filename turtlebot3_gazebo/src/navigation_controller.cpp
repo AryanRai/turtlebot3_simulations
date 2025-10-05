@@ -54,8 +54,8 @@ void NavigationController::processNavigation() {
         current_sensor_data_,
         current_pose_);
     
-    // Get command for current state
-    current_command_ = state_machine_->getStateCommand();
+    // Get command for current state (with sensor data for wall-following)
+    current_command_ = state_machine_->getStateCommand(current_sensor_data_);
 }
 
 MotionCommand NavigationController::getMotionCommand() const {

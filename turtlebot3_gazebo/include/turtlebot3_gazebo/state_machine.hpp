@@ -54,18 +54,32 @@ public:
     
     /**
      * @brief Get motion command for current state
+     * @param data Current sensor data for wall-following control
      * @return Motion command with velocities
      */
-    MotionCommand getStateCommand() const;
+    MotionCommand getStateCommand(const SensorData& data) const;
     
 private:
     RobotState current_state_;   // Current navigation state
     double prev_pose_;           // Previous yaw for turn tracking
     double escape_range_;        // Turn angle in radians (30°)
+    double sharp_turn_angle_;    // Sharp turn angle in radians (90°)
     
     // Thresholds for decision making
     double forward_threshold_;   // Minimum forward clearance (m)
     double side_threshold_;      // Target wall distance (m)
+    
+    // Collision detection
+    double prev_x_;              // Previous X position
+    double prev_y_;              // Previous Y position
+    int stuck_counter_;          // Counter for detecting stuck state
+    int recovery_counter_;       // Counter for recovery duration
+    
+    // Helper functions
+    bool isCollisionDetected(const SensorData& data, const RobotPose& pose);
+    bool isStable(const RobotPose& pose) const;
+    bool isCornerDetected(const SensorData& data) const;
+    double calculateWallFollowingCorrection(const SensorData& data) const;
 };
 
 }  // namespace turtlebot3_gazebo
