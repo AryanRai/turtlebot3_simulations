@@ -1,0 +1,73 @@
+// Copyright 2025 MTRX3760 Project Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef TURTLEBOT3_GAZEBO__STATE_MACHINE_HPP_
+#define TURTLEBOT3_GAZEBO__STATE_MACHINE_HPP_
+
+#include "turtlebot3_gazebo/common_types.hpp"
+
+namespace turtlebot3_gazebo {
+
+/**
+ * @brief Manages robot navigation states and transitions
+ * 
+ * Implements right wall following logic through state machine.
+ * Handles state transitions based on sensor data and robot pose.
+ */
+class StateMachine {
+public:
+    /**
+     * @brief Constructor with default parameters
+     */
+    StateMachine();
+    
+    /**
+     * @brief Set current state
+     * @param state New robot state
+     */
+    void setState(RobotState state);
+    
+    /**
+     * @brief Get current state
+     * @return Current robot state
+     */
+    RobotState getState() const;
+    
+    /**
+     * @brief Check if state transition should occur and update state
+     * @param data Current sensor data
+     * @param pose Current robot pose
+     * @return true if state changed
+     */
+    bool shouldTransition(const SensorData& data, const RobotPose& pose);
+    
+    /**
+     * @brief Get motion command for current state
+     * @return Motion command with velocities
+     */
+    MotionCommand getStateCommand() const;
+    
+private:
+    RobotState current_state_;   // Current navigation state
+    double prev_pose_;           // Previous yaw for turn tracking
+    double escape_range_;        // Turn angle in radians (30°)
+    
+    // Thresholds for decision making
+    double forward_threshold_;   // Minimum forward clearance (m)
+    double side_threshold_;      // Target wall distance (m)
+};
+
+}  // namespace turtlebot3_gazebo
+
+#endif  // TURTLEBOT3_GAZEBO__STATE_MACHINE_HPP_

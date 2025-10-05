@@ -1,4 +1,5 @@
 // Copyright 2019 ROBOTIS CO., LTD.
+// Copyright 2025 MTRX3760 Project Team (Refactored)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +14,7 @@
 // limitations under the License.
 //
 // Authors: Taehun Lim (Darby), Ryan Shim
+// Refactored by: MTRX3760 Project Team
 
 #ifndef TURTLEBOT3_GAZEBO__TURTLEBOT3_DRIVE_HPP_
 #define TURTLEBOT3_GAZEBO__TURTLEBOT3_DRIVE_HPP_
@@ -24,47 +26,57 @@
 #include <tf2/LinearMath/Matrix3x3.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 
-#define DEG2RAD (M_PI / 180.0)
-#define RAD2DEG (180.0 / M_PI)
+#include "turtlebot3_gazebo/common_types.hpp"
+#include "turtlebot3_gazebo/navigation_controller.hpp"
+#include "turtlebot3_gazebo/sensor_processor.hpp"
+#include "turtlebot3_gazebo/motion_controller.hpp"
 
-#define CENTER 0
-#define LEFT   1
-#define RIGHT  2
+namespace turtlebot3_gazebo {
 
-#define LINEAR_VELOCITY  0.3
-#define ANGULAR_VELOCITY 1.5
-
-#define GET_TB3_DIRECTION 0
-#define TB3_DRIVE_FORWARD 1
-#define TB3_RIGHT_TURN    2
-#define TB3_LEFT_TURN     3
-
+/**
+ * @brief Main ROS2 node for Turtlebot3 autonomous navigation
+ * 
+ * Orchestrates ROS2 communication and coordinates navigation components.
+ * Implements right wall following algorithm through object-oriented design.
+ */
 class Turtlebot3Drive : public rclcpp::Node
 {
 public:
-  Turtlebot3Drive();
-  ~Turtlebot3Drive();
+    /**
+     * @brief Constructor - initializes node and components
+     */
+    Turtlebot3Drive();
+    
+    /**
+     * @brief Destructor - cleanup
+     */
+    ~Turtlebot3Drive();
 
 private:
-  // ROS topic publishers
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+    // Navigation components
+    NavigationController* nav_controller_;
+    SensorProcessor* sensor_processor_;
+    MotionController* motion_controller_;
+    
+    // ROS2 publishers
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
-  // ROS topic subscribers
-  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    // ROS2 subscribers
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 
-  // Variables
-  double robot_pose_;
-  double prev_robot_pose_;
-  double scan_data_[3];
+    // Robot state
+    RobotPose robot_pose_;
 
-  // ROS timer
-  rclcpp::TimerBase::SharedPtr update_timer_;
+    // ROS2 timer
+    rclcpp::TimerBase::SharedPtr update_timer_;
 
-  // Function prototypes
-  void update_callback();
-  void update_cmd_vel(double linear, double angular);
-  void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
-  void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
+    // Callback functions
+    void update_callback();
+    void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+    void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
 };
+
+}  // namespace turtlebot3_gazebo
+
 #endif  // TURTLEBOT3_GAZEBO__TURTLEBOT3_DRIVE_HPP_
