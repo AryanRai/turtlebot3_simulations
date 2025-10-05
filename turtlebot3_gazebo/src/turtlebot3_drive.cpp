@@ -46,7 +46,7 @@ Turtlebot3Drive::Turtlebot3Drive()
     auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
     
     // Publisher
-    cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
+    cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(
         "cmd_vel", qos);
     
     // Subscribers
@@ -128,9 +128,12 @@ void Turtlebot3Drive::update_callback()
     // Get motion command from navigation controller
     MotionCommand cmd = nav_controller_->getMotionCommand();
     
-    // Create Twist message and publish
-    geometry_msgs::msg::Twist twist = motion_controller_->createTwistCommand(cmd);
-    cmd_vel_pub_->publish(twist);
+    // Create TwistStamped message and publish
+    geometry_msgs::msg::TwistStamped twist_stamped;
+    twist_stamped.header.stamp = this->now();
+    twist_stamped.header.frame_id = "";
+    twist_stamped.twist = motion_controller_->createTwistCommand(cmd);
+    cmd_vel_pub_->publish(twist_stamped);
 }
 
 }  // namespace turtlebot3_gazebo
