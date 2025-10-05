@@ -48,42 +48,38 @@ bool StateMachine::shouldTransition(
                 prev_pose_ = pose.yaw;
                 current_state_ = RobotState::TURN_LEFT;
                 state_changed = true;
-            } else if (data.right_distance > side_threshold_ + 0.2) {
-                // Right wall too far, turn right to get closer
-                prev_pose_ = pose.yaw;
-                current_state_ = RobotState::TURN_RIGHT;
-                state_changed = true;
-            } else if (data.right_distance < side_threshold_ - 0.2) {
-                // Right wall too close, turn left to avoid collision
-                prev_pose_ = pose.yaw;
-                current_state_ = RobotState::TURN_LEFT;
-                state_changed = true;
             } else {
-                // Good distance from right wall, drive forward
+                // Forward is clear, just drive and adjust based on wall distance
                 current_state_ = RobotState::DRIVE_FORWARD;
                 state_changed = true;
             }
             break;
             
         case RobotState::DRIVE_FORWARD:
-            // Check if we need to adjust - don't immediately go back to GET_DIRECTION
+            // Check if we need to stop and turn sharply
             if (data.forward_distance < forward_threshold_) {
                 // Obstacle ahead, need to turn
                 current_state_ = RobotState::GET_DIRECTION;
                 state_changed = true;
-            } else if (data.right_distance > side_threshold_ + 0.3 || 
-                       data.right_distance < side_threshold_ - 0.3) {
-                // Wall distance changed significantly, need to adjust
-                current_state_ = RobotState::GET_DIRECTION;
-                state_changed = true;
             }
-            // Otherwise keep driving forward
+            // Otherwise keep driving forward (with angular adjustment in getStateCommand)
             break;
             
         case RobotState::TURN_RIGHT:
         case RobotState::TURN_LEFT:
-            // Check if turn is complete (turned 30°)
-            if (std::fabs(prev_pose_ - pose.yaw) >= escape_range_) {
+            // Turn until forward is clear OR we've turned enough
+            double angle_turned = std::fabs(prev_pose_ - pose.yaw);
+            // Handle angle wrapping around ±π
+            if (angle_turned > M_PI) {
+                angle_turned = 2 * M_PI - angle_turned;
+            }
+            
+            if (data.forward_distance > forward_threshold_ && angle_turned >= escape_range_ * 0.5) {
+                // Forward is clear and we've turned at least 15°, go back to driving
+                current_state_ = RobotState::GET_DIRECTION;
+                state_changed = true;
+            } else if (angle_turned >= escape_range_) {
+                // Turned full 30°, check situation again
                 current_state_ = RobotState::GET_DIRECTION;
                 state_changed = true;
             }
@@ -110,15 +106,15 @@ MotionCommand StateMachine::getStateCommand() const {
             break;
             
         case RobotState::TURN_RIGHT:
-            // Rotate clockwise
+            // Rotate clockwise (slower to avoid overshooting)
             cmd.linear = 0.0;
-            cmd.angular = -1.5;
+            cmd.angular = -0.8;
             break;
             
         case RobotState::TURN_LEFT:
-            // Rotate counter-clockwise
+            // Rotate counter-clockwise (slower to avoid overshooting)
             cmd.linear = 0.0;
-            cmd.angular = 1.5;
+            cmd.angular = 0.8;
             break;
     }
     
