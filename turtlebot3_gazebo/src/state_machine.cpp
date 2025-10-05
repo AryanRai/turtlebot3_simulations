@@ -30,7 +30,8 @@ StateMachine::StateMachine()
   recovery_counter_(0),
   opening_detected_(false),
   opening_start_x_(0.0),
-  opening_start_y_(0.0)
+  opening_start_y_(0.0),
+  prev_right_distance_(0.0)
 {
 }
 
@@ -167,9 +168,10 @@ bool StateMachine::shouldTransition(
             break;
     }
     
-    // Update position tracking
+    // Update position and sensor tracking
     prev_x_ = pose.x;
     prev_y_ = pose.y;
+    prev_right_distance_ = data.right_distance;
     
     return state_changed;
 }
@@ -220,28 +222,51 @@ bool StateMachine::isCornerDetected(const SensorData& data) const {
 }
 
 bool StateMachine::isRightTurnOpportunity(const SensorData& data) const {
-    // Detect 90° right turn opportunity: right wall suddenly opens up significantly
-    // Use a much larger threshold to ensure we're at the actual corner, not just seeing it ahead
-    const double right_opening_threshold = 2.0;  // Right side opens up significantly
+    // Detect 90° right turn opportunity by looking for a significant increase in right distance
+    // This indicates the right wall has ended (opening appeared)
     
-    // Only trigger if forward is clear AND right side is very open
-    // This ensures we're at the corner, not just approaching it
+    const double min_increase = 1.0;  // Right distance must increase by at least 1.0m
+    const double min_absolute_distance = 2.5;  // And be at least 2.5m away
+    
+    // Check if right distance increased significantly from previous reading
+    double distance_increase = data.right_distance - prev_right_distance_;
+    
+    // Only trigger if:
+    // 1. Forward is clear
+    // 2. Right distance increased significantly (wall ended)
+    // 3. Right distance is now large (confirming opening)
     return (data.forward_distance > forward_threshold_ + 0.3 && 
-            data.right_distance > right_opening_threshold);
+            distance_increase > min_increase &&
+            data.right_distance > min_absolute_distance);
 }
 
 double StateMachine::calculateWallFollowingCorrection(const SensorData& data) const {
-    // Proportional control to maintain constant distance from right wall
-    // Target distance is side_threshold_ (0.6m)
-    
-    const double kp = 1.5;  // Proportional gain
+    const double kp = 1.5;  // Proportional gain for single wall following
+    const double kp_center = 0.3;  // Much lower gain for centering to avoid oscillation
     const double max_correction = 0.5;  // Maximum angular correction (rad/s)
+    const double wall_detect_threshold = 3.5;  // Distance to consider a wall present (increased for wider corridors)
     
-    // Calculate error: positive = too far, negative = too close
-    double error = data.right_distance - side_threshold_;
+    bool left_wall_present = data.left_distance < wall_detect_threshold;
+    bool right_wall_present = data.right_distance < wall_detect_threshold;
     
-    // Apply proportional control
-    double correction = kp * error;
+    double correction = 0.0;
+    
+    if (left_wall_present && right_wall_present) {
+        // Both walls detected - center between them with gentle correction
+        // If left_distance > right_distance, we're closer to right wall, turn left (positive)
+        // If right_distance > left_distance, we're closer to left wall, turn right (negative)
+        double balance_error = data.left_distance - data.right_distance;
+        correction = kp_center * balance_error;  // Use lower gain to prevent oscillation
+    } else if (right_wall_present) {
+        // Only right wall - maintain distance from it
+        double error = data.right_distance - side_threshold_;
+        correction = -kp * error;  // Negate because positive angular = left turn
+    } else if (left_wall_present) {
+        // Only left wall - maintain distance from it
+        double error = data.left_distance - side_threshold_;
+        correction = kp * error;  // Positive = turn left away from wall
+    }
+    // If no walls detected, correction stays 0 (drive straight)
     
     // Clamp correction to avoid excessive turning
     if (correction > max_correction) {
@@ -250,9 +275,7 @@ double StateMachine::calculateWallFollowingCorrection(const SensorData& data) co
         correction = -max_correction;
     }
     
-    // Positive correction = turn right (toward wall)
-    // Negative correction = turn left (away from wall)
-    return -correction;  // Negate because positive angular = left turn
+    return correction;
 }
 
 MotionCommand StateMachine::getStateCommand(const SensorData& data) const {
@@ -266,16 +289,12 @@ MotionCommand StateMachine::getStateCommand(const SensorData& data) const {
             break;
             
         case RobotState::DRIVE_FORWARD: {
-            // Move forward with wall-following correction
+            // Move forward with wall-following/centering correction
             cmd.linear = 0.3;
             
-            // Apply proportional control to maintain parallel distance
-            if (data.right_distance < 2.0) {  // Only correct if wall is detected
-                cmd.angular = calculateWallFollowingCorrection(data);
-            } else {
-                // No wall detected, drive straight
-                cmd.angular = 0.0;
-            }
+            // Apply wall following or centering correction
+            // The function handles all cases (both walls, one wall, or no walls)
+            cmd.angular = calculateWallFollowingCorrection(data);
             break;
         }
             

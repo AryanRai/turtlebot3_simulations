@@ -79,6 +79,7 @@ private:
     bool opening_detected_;      // Flag when opening is first detected
     double opening_start_x_;     // X position when opening detected
     double opening_start_y_;     // Y position when opening detected
+    double prev_right_distance_; // Previous right distance for change detection
     
     // Helper functions
     bool isCollisionDetected(const SensorData& data, const RobotPose& pose);
