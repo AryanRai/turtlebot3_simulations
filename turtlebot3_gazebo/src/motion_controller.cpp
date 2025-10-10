@@ -23,7 +23,7 @@ MotionController::MotionController()
 }
 
 geometry_msgs::msg::Twist MotionController::createTwistCommand(
-    const MotionCommand& cmd)
+    const MotionCommand& cmd) const
 {
     geometry_msgs::msg::Twist twist;
     twist.linear.x = cmd.linear;
@@ -35,7 +35,8 @@ geometry_msgs::msg::Twist MotionController::createTwistCommand(
     return twist;
 }
 
-void MotionController::setVelocities(double linear, double angular) {
+void MotionController::setVelocities(const double linear, const double angular)
+{
     linear_velocity_ = linear;
     angular_velocity_ = angular;
 }

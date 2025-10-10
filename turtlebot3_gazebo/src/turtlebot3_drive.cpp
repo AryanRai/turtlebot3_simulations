@@ -19,12 +19,13 @@
 #include "turtlebot3_gazebo/turtlebot3_drive.hpp"
 #include <memory>
 
-using namespace std::chrono_literals;
-
 namespace turtlebot3_gazebo {
 
 Turtlebot3Drive::Turtlebot3Drive()
-: Node("turtlebot3_drive_node")
+: Node("turtlebot3_drive_node"),
+  nav_controller_(nullptr),
+  sensor_processor_(nullptr),
+  motion_controller_(nullptr)
 {
     /************************************************************
     ** Initialize navigation components
@@ -79,7 +80,7 @@ Turtlebot3Drive::Turtlebot3Drive()
     ** Initialize ROS2 timer (100Hz control loop)
     ************************************************************/
     update_timer_ = this->create_wall_timer(
-        10ms,
+        std::chrono::milliseconds(10),
         std::bind(&Turtlebot3Drive::update_callback, this));
     
     RCLCPP_INFO(this->get_logger(), 
@@ -88,10 +89,19 @@ Turtlebot3Drive::Turtlebot3Drive()
 
 Turtlebot3Drive::~Turtlebot3Drive()
 {
-    // Cleanup components
-    delete nav_controller_;
-    delete sensor_processor_;
-    delete motion_controller_;
+    // Cleanup components - check for NULL before deleting
+    if (nav_controller_ != nullptr) {
+        delete nav_controller_;
+        nav_controller_ = nullptr;
+    }
+    if (sensor_processor_ != nullptr) {
+        delete sensor_processor_;
+        sensor_processor_ = nullptr;
+    }
+    if (motion_controller_ != nullptr) {
+        delete motion_controller_;
+        motion_controller_ = nullptr;
+    }
     
     RCLCPP_INFO(this->get_logger(), 
         "Turtlebot3 Drive Node terminated");

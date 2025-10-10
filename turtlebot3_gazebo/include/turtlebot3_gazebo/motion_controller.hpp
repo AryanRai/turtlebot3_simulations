@@ -38,14 +38,14 @@ public:
      * @param cmd Motion command with linear and angular velocities
      * @return Twist message ready for publishing
      */
-    geometry_msgs::msg::Twist createTwistCommand(const MotionCommand& cmd);
+    geometry_msgs::msg::Twist createTwistCommand(const MotionCommand& cmd) const;
     
     /**
      * @brief Set velocity parameters
      * @param linear Linear velocity in m/s
      * @param angular Angular velocity in rad/s
      */
-    void setVelocities(double linear, double angular);
+    void setVelocities(const double linear, const double angular);
     
 private:
     double linear_velocity_;   // Default linear velocity (m/s)

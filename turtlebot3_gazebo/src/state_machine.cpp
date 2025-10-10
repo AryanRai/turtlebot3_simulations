@@ -18,13 +18,54 @@
 
 namespace turtlebot3_gazebo {
 
+// Navigation constants
+const double ESCAPE_ANGLE_DEG = 30.0;          // Gentle turn angle (degrees)
+const double SHARP_TURN_ANGLE_DEG = 90.0;      // Sharp turn angle (degrees)
+const double FORWARD_THRESHOLD = 0.7;          // Minimum forward clearance (m)
+const double SIDE_THRESHOLD = 0.6;             // Target wall distance (m)
+const double DEFAULT_CORRIDOR_WIDTH = 2.0;     // Default corridor width (m)
+
+// Collision detection constants
+const double TILT_THRESHOLD_DEG = 5.0;         // Tilt threshold for collision (degrees)
+const double STABLE_THRESHOLD_DEG = 2.0;       // Tilt threshold for stability (degrees)
+const double MIN_MOVEMENT_THRESHOLD = 0.001;   // Minimum movement to detect stuck (m)
+const int STUCK_COUNTER_THRESHOLD = 20;        // Cycles before declaring stuck
+const double COLLISION_DISTANCE = 0.15;        // Distance threshold for collision (m)
+
+// Turn detection constants
+const double CORNER_THRESHOLD = 1.5;           // Distance for corner detection (m)
+const double TURN_FORWARD_CLEARANCE = 0.5;     // Extra forward clearance for turns (m)
+const double TURN_RIGHT_OPEN_THRESHOLD = 2.5;  // Right side opening threshold (m)
+const double TURN_LEFT_WALL_THRESHOLD = 2.0;   // Left wall presence threshold (m)
+
+// Wall following constants
+const double WALL_DETECT_THRESHOLD = 3.5;      // Distance to consider wall present (m)
+const double KP_SINGLE_WALL = 1.5;             // Proportional gain for single wall
+const double KP_CENTERING = 0.3;               // Proportional gain for centering
+const double MAX_ANGULAR_CORRECTION = 0.5;     // Maximum angular correction (rad/s)
+
+// Velocity constants
+const double LINEAR_VELOCITY_FORWARD = 0.3;    // Forward linear velocity (m/s)
+const double ANGULAR_VELOCITY_GENTLE = 0.8;    // Gentle turn angular velocity (rad/s)
+const double ANGULAR_VELOCITY_SHARP = 2.0;     // Sharp turn angular velocity (rad/s)
+const double LINEAR_VELOCITY_RECOVERY = -0.1;  // Recovery backup velocity (m/s)
+
+// Recovery constants
+const int RECOVERY_BACKUP_CYCLES = 30;         // Cycles to back up during recovery
+const int RECOVERY_MIN_CYCLES = 50;            // Minimum recovery cycles
+
+// Adaptive turn constants
+const double MIN_TURN_DISTANCE = 0.15;         // Minimum turn distance (m)
+const double MAX_TURN_DISTANCE = 0.4;          // Maximum turn distance (m)
+const double TURN_DISTANCE_FACTOR = 0.15;      // Turn distance as fraction of corridor width
+
 StateMachine::StateMachine()
 : current_state_(RobotState::GET_DIRECTION),
   prev_pose_(0.0),
-  escape_range_(30.0 * DEG2RAD),
-  sharp_turn_angle_(90.0 * DEG2RAD),
-  forward_threshold_(0.7),
-  side_threshold_(0.6),
+  escape_range_(ESCAPE_ANGLE_DEG * DEG2RAD),
+  sharp_turn_angle_(SHARP_TURN_ANGLE_DEG * DEG2RAD),
+  forward_threshold_(FORWARD_THRESHOLD),
+  side_threshold_(SIDE_THRESHOLD),
   prev_x_(0.0),
   prev_y_(0.0),
   stuck_counter_(0),
@@ -33,12 +74,13 @@ StateMachine::StateMachine()
   opening_start_x_(0.0),
   opening_start_y_(0.0),
   prev_right_distance_(0.0),
-  corridor_width_(2.0),  // Default corridor width
+  corridor_width_(DEFAULT_CORRIDOR_WIDTH),
   use_centering_(false)  // Default to right-wall-follow (more reliable for maze solving)
 {
 }
 
-void StateMachine::setUseCentering(bool enable) {
+void StateMachine::setUseCentering(const bool enable)
+{
     use_centering_ = enable;
 }
 
@@ -46,32 +88,26 @@ bool StateMachine::getUseCentering() const {
     return use_centering_;
 }
 
-double StateMachine::calculateAdaptiveTurnDistance(double corridor_width) const {
+double StateMachine::calculateAdaptiveTurnDistance(const double corridor_width) const
+{
     // Calculate how far to drive into opening before turning
     // Based on corridor width for adaptive behavior
     
-    // Strategy: Turn early to avoid overshooting
-    // Reduced distances for more responsive turning
-    
-    const double min_distance = 0.15;  // Minimum turn distance (narrow corridors)
-    const double max_distance = 0.4;   // Maximum turn distance (wide corridors) - REDUCED
-    
     // Calculate turn distance as a fraction of corridor width
-    // For a 2m corridor: turn at ~0.3m (15% of width) - REDUCED from 40%
-    // For a 4m corridor: turn at ~0.4m (capped at max) - REDUCED
-    double turn_distance = corridor_width * 0.15;  // REDUCED from 0.4 to 0.15
+    double turn_distance = corridor_width * TURN_DISTANCE_FACTOR;
     
     // Clamp to reasonable bounds
-    if (turn_distance < min_distance) {
-        turn_distance = min_distance;
-    } else if (turn_distance > max_distance) {
-        turn_distance = max_distance;
+    if (turn_distance < MIN_TURN_DISTANCE) {
+        turn_distance = MIN_TURN_DISTANCE;
+    } else if (turn_distance > MAX_TURN_DISTANCE) {
+        turn_distance = MAX_TURN_DISTANCE;
     }
     
     return turn_distance;
 }
 
-void StateMachine::setState(RobotState state) {
+void StateMachine::setState(const RobotState state)
+{
     current_state_ = state;
 }
 

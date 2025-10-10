@@ -17,9 +17,17 @@
 
 namespace turtlebot3_gazebo {
 
+// Constants for sensor processing
+const double DEFAULT_FORWARD_THRESHOLD = 0.7;  // Minimum forward clearance (m)
+const double DEFAULT_SIDE_THRESHOLD = 0.6;     // Target wall distance (m)
+const int SCAN_ANGLE_CENTER = 0;               // Center scan angle (degrees)
+const int SCAN_ANGLE_LEFT = 30;                // Left scan angle (degrees)
+const int SCAN_ANGLE_RIGHT = 330;              // Right scan angle (degrees)
+const int NUM_SCAN_ANGLES = 3;                 // Number of scan angles to process
+
 SensorProcessor::SensorProcessor()
-: forward_threshold_(0.7),
-  side_threshold_(0.6)
+: forward_threshold_(DEFAULT_FORWARD_THRESHOLD),
+  side_threshold_(DEFAULT_SIDE_THRESHOLD)
 {
     scan_data_[CENTER] = 0.0;
     scan_data_[LEFT] = 0.0;
@@ -30,9 +38,13 @@ void SensorProcessor::processScan(
     const sensor_msgs::msg::LaserScan::SharedPtr msg)
 {
     // Extract distances at key angles: 0°, 30°, 330°
-    uint16_t scan_angle[3] = {0, 30, 330};
+    const uint16_t scan_angle[NUM_SCAN_ANGLES] = {
+        SCAN_ANGLE_CENTER,
+        SCAN_ANGLE_LEFT,
+        SCAN_ANGLE_RIGHT
+    };
     
-    for (int num = 0; num < 3; num++) {
+    for (int num = 0; num < NUM_SCAN_ANGLES; num++) {
         // Handle infinite values by capping at max range
         if (std::isinf(msg->ranges.at(scan_angle[num]))) {
             scan_data_[num] = msg->range_max;

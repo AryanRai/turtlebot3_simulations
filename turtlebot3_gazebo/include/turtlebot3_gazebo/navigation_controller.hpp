@@ -55,7 +55,7 @@ public:
      * @brief Enable or disable centering mode
      * @param enable True for centering mode, False for right-wall-only mode
      */
-    void setUseCentering(bool enable);
+    void setUseCentering(const bool enable);
     
     /**
      * @brief Get current centering mode status

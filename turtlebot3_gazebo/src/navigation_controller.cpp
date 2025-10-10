@@ -16,7 +16,9 @@
 
 namespace turtlebot3_gazebo {
 
-NavigationController::NavigationController() {
+NavigationController::NavigationController()
+: state_machine_(nullptr)
+{
     state_machine_ = new StateMachine();
     
     // Initialize with zero values
@@ -27,13 +29,20 @@ NavigationController::NavigationController() {
     current_pose_.x = 0.0;
     current_pose_.y = 0.0;
     current_pose_.yaw = 0.0;
+    current_pose_.roll = 0.0;
+    current_pose_.pitch = 0.0;
     
     current_command_.linear = 0.0;
     current_command_.angular = 0.0;
 }
 
-NavigationController::~NavigationController() {
-    delete state_machine_;
+NavigationController::~NavigationController()
+{
+    // Check for NULL before deleting
+    if (state_machine_ != nullptr) {
+        delete state_machine_;
+        state_machine_ = nullptr;
+    }
 }
 
 void NavigationController::update(
@@ -62,7 +71,8 @@ MotionCommand NavigationController::getMotionCommand() const {
     return current_command_;
 }
 
-void NavigationController::setUseCentering(bool enable) {
+void NavigationController::setUseCentering(const bool enable)
+{
     state_machine_->setUseCentering(enable);
 }
 

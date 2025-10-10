@@ -36,7 +36,7 @@ public:
      * @brief Set current state
      * @param state New robot state
      */
-    void setState(RobotState state);
+    void setState(const RobotState state);
     
     /**
      * @brief Get current state
@@ -63,7 +63,7 @@ public:
      * @brief Enable or disable centering mode
      * @param enable True for centering mode, False for right-wall-only mode
      */
-    void setUseCentering(bool enable);
+    void setUseCentering(const bool enable);
     
     /**
      * @brief Get current centering mode status
@@ -103,7 +103,7 @@ private:
     bool isCornerDetected(const SensorData& data) const;
     bool isRightTurnOpportunity(const SensorData& data) const;
     double calculateWallFollowingCorrection(const SensorData& data) const;
-    double calculateAdaptiveTurnDistance(double corridor_width) const;
+    double calculateAdaptiveTurnDistance(const double corridor_width) const;
 };
 
 }  // namespace turtlebot3_gazebo

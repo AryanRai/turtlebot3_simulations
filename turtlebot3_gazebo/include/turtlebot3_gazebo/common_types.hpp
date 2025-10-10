@@ -20,13 +20,13 @@
 namespace turtlebot3_gazebo {
 
 // Conversion constants
-#define DEG2RAD (M_PI / 180.0)
-#define RAD2DEG (180.0 / M_PI)
+constexpr double DEG2RAD = M_PI / 180.0;
+constexpr double RAD2DEG = 180.0 / M_PI;
 
 // Sensor array indices
-#define CENTER 0
-#define LEFT   1
-#define RIGHT  2
+constexpr int CENTER = 0;
+constexpr int LEFT = 1;
+constexpr int RIGHT = 2;
 
 /**
  * @brief Sensor data extracted from LiDAR scan
