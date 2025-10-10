@@ -65,6 +65,16 @@ target_link_libraries(${EXEC_NAME}
   tf2::tf2
 )
 
+# Path visualizer executable
+add_executable(path_visualizer
+  src/path_visualizer.cpp
+)
+target_link_libraries(path_visualizer
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  rclcpp::rclcpp
+)
+
 set(OBSTACLE_LIBS
   obstacles
   obstacle1
@@ -85,6 +95,7 @@ endforeach()
 ################################################################################
 install(TARGETS
   ${EXEC_NAME}
+  path_visualizer
   obstacles
   obstacle1
   obstacle2
