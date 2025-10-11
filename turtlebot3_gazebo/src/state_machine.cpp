@@ -404,8 +404,11 @@ double StateMachine::calculateWallFollowingCorrection(const SensorData& data) co
             // Right wall present - maintain distance from it
             double error = data.right_distance - side_threshold_;
             correction = -kp * error;
+        } else {
+            // No right wall detected - turn right to search for wall
+            // This helps the robot find and follow walls in open environments
+            correction = -0.3;  // Gentle right turn to search for wall
         }
-        // Ignore left wall, drive straight if no right wall
     }
     
     // Clamp correction to avoid excessive turning
